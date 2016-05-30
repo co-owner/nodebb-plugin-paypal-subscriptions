@@ -53,6 +53,7 @@
 				}
 			}
 		}
+        /*Search through nodebb's groups*/
 		socket.emit('groups.search', function(err, data) {
 			groupList = data;
 			console.log(groupList);

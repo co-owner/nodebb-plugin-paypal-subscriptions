@@ -28,6 +28,10 @@ local.properties
 # PDT-specific
 .buildpath
 
+#################
+## Windows Batch
+#################
+*.bat
 
 #################
 ## Visual Studio
