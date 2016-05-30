@@ -118,17 +118,17 @@
 			$('.group').each(function(index, child) {
 				child = $(child);
 				var groupItem = {
-					name: child.find('subscription-name').val(),
-					group: child.find('subscription-group').val(),
-					username: child.find('subscription-username').val(),
-					cost: child.find('subscription-cost').val(),
-					graceinterval: child.find('subscription-grace-interval').val(),
-					gracecount: child.find('subscription-grace-count').val(),
-					trialinterval: child.find('subscription-trial-interval').val(),
-					trialcount: child.find('subscription-trial-count').val(),
-					interval: child.find('subscription-interval').val(),
-					count: child.find('subscription-count').val(),
-					endBehavior: child.find('subscription-end-behavior').val()
+					name: child.find('.subscription-name').val(),
+					group: child.find('.subscription-group').val(),
+					username: child.find('.subscription-username').val(),
+					cost: child.find('.subscription-cost').val(),
+					graceinterval: child.find('.subscription-grace-interval').val(),
+					gracecount: child.find('.subscription-grace-count').val(),
+					trialinterval: child.find('.subscription-trial-interval').val(),
+					trialcount: child.find('.subscription-trial-count').val(),
+					interval: child.find('.subscription-interval').val(),
+					count: child.find('.subscription-count').val(),
+					endBehavior: child.find('.subscription-end-behavior').val()
 				};
 				/*Must haves~before we save anything...*/
                 console.log(groupItem);
