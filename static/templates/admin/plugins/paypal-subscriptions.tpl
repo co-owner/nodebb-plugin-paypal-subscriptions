@@ -75,9 +75,7 @@
 		});
 		$('#addSubscription').on('click', function() {
 			ajaxify.loadTemplate('partials/groups', function(groupTemplate) {
-				console.log(groupTemplate);
 				var tempBlock = templates.getBlock(groupTemplate, 'groups');
-				console.log(tempBlock);
 				/*filling in the defaults*/
 				var html = templates.parse(tempBlock, {
 					groups: [{
@@ -94,14 +92,7 @@
 						endbehavior: 'blocked'
 					}]
 				});
-				if(html == null){
-					console.log("html is null?");
-				} else if(html == ''){
-					console.log("html is ''");
-				} else {
-					
-				}
-				console.log(html);
+
 				var newGroup = $(html).appendTo('.groups');
 				enableAutoComplete(newGroup.find('.subscription-admin'));
 				/*enableTagsInput(newFeed.find('.feed-tags'));*/
