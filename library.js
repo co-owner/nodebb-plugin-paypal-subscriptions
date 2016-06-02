@@ -25,18 +25,6 @@ var async = module.parent.require('async'),
 	var settings = {};
 	
 	/*Make sensible cron jobs*/
-    /*
-	cronJobs.push(new cron('* * * * * *', function() { pullGroupsInterval('second'); }, null, false));
-	cronJobs.push(new cron('00 * * * * *', function() { pullGroupsInterval('minute'); }, null, false));
-	cronJobs.push(new cron('00 00 0-23 * * *', function() { pullGroupsInterval('hour'); }, null, false));
-	//cronJobs.push(new cron('00 00 * * * *', function() { pullGroupsInterval('hour'); }, null, false));
-	cronJobs.push(new cron('00 00 00 * * 0-6', function() { pullGroupsInterval('day'); }, null, false));
-	//cronJobs.push(new cron('00 00 00 * * *', function() { pullGroupsInterval('day'); }, null, false));
-	cronJobs.push(new cron('00 00 00 * * 0', function() { pullGroupsInterval('week'); }, null, false));
-	cronJobs.push(new cron('00 00 00 1 0-11 *', function() { pullGroupsInterval('month'); }, null, false));
-	//cronJobs.push(new cron('00 00 00 1 * *', function() { pullGroupsInterval('month'); }, null, false));
-	cronJobs.push(new cron('00 00 00 1 0 *', function() { pullGroupsInterval('year'); }, null, false));
-	*/
     /*these should happen often*/
     cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('justjoined'); }, null, false)); /*Checks if there's a trial period*/
     cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('trial'); }, null, false));
@@ -242,40 +230,6 @@ var async = module.parent.require('async'),
 		}
 	}
 	/**/
-	function pullGroupsInterval(interval) {
-		subscriptions.getAllSubscriptionSettings(function(err, groups) {
-			if (err || !Array.isArray(groups)) {
-				return;
-			}
-			groups = groups.filter(function(item) {
-				/*No idea how to use this yet...*/
-				return item && item.interval == interval;
-			});
-
-			pullGroups(groups);
-		});
-	}
-
-	function pullGroups(groups) {
-		async.eachSeries(groups, pullGroup, function(err) {
-			if (err) {
-				winston.error(err.message);
-			}
-		});
-	}
-
-	function pullGroup(group, callback) {
-		if(!group) {
-			return callback();
-		}
-		if(!group.intervalCount){
-			group.intervalCount = 0;
-		}
-		/*do stuffs*/
-		
-		/*exit*/
-		return callback();
-	}
 
 	var admin = {};
 

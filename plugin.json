@@ -37,7 +37,7 @@
         },
         {
             "hook": "action:group.rename", "method": "admin.onGroupRenamed"
-        },
+        }
 	],
 	"staticDirs": {
 		"static": "./static"
