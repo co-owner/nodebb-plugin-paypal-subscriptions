@@ -164,6 +164,8 @@ var async = module.parent.require('async'),
 	  	router.get('/api/admin/plugins/paypal-subscriptions', params.middleware.applyCSRF, renderAdminPage);
 	  	router.post('/api/admin/plugins/paypal-subscriptions/save', params.middleware.applyCSRF, save);
 	  
+        router.get('/admin/plugins/paypal-subscriptions-overview', params.middleware.applyCSRF, hostMiddleware.admin.buildHeader, renderAdminOverviewPage);
+      
 	  	callback();
 	};
 	
@@ -183,6 +185,47 @@ var async = module.parent.require('async'),
 			res.render('admin/plugins/paypal-subscriptions', results);
 		});
 	};
+    
+    function renderAdminOverviewPage(req, res, next) {
+        async.parallel({
+			usersubscriptions: function(next) {
+				subscriptions.getUserSubscriptions(next);
+			},
+			subscriptions: function(next) {
+				subscriptions.getAllSubscriptionSettings(next);
+			}
+		}, function(err, results) {
+			if(err) {
+				return next(err);
+			}
+			results.csrf = req.csrfToken();
+			res.render('admin/plugins/paypal-usersubscriptions', results);
+		});
+    }
+    
+    function saveUserSubscriptions(req, res, next){
+        subscriptions.deleteUserSubscriptions(function(err) {
+			if (err) {
+				return next(err);
+			}
+
+			if (!req.body.usersubscriptions) {
+				return res.json({message:'Users Subscriptions Saved (no subscriptions)!'});
+			}
+            /*may need parallel in the future, but not now*/
+			async.parallel([
+				function(next) {
+					subscriptions.addUserSubscriptions(req.body.usersubscriptions, next);
+				}
+			], function(err) {
+				if(err) {
+					return next(err);
+				}
+
+				res.json({message: 'Subscriptions Saved!'});
+			});
+		});
+    }
 
 	function save(req, res, next) {
 		subscriptions.deleteAllSubscriptionSettings(function(err) {
