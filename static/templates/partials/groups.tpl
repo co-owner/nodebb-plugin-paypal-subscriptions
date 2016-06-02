@@ -75,7 +75,7 @@
 		<div class="col-sm-2 col-xs-12">
 			<div class="form-group">
 				<label>Per</label>
-				<select class="form-control subscription-interval" data-interval="{groups.interval}">
+				<select class="form-control subscription-interval" data-interval="{groups.subscriptioninterval}">
 				  <option value="minute">Minutes</option>
 					<option value="hour">Hours</option>
 					<option value="day">Days</option>
@@ -89,7 +89,7 @@
 		<div class="col-sm-2 col-xs-12">
 			<div class="form-group">
 				<label># Intervals / Default Subscription</label>
-				<input type="text" class="form-control subscription-count" placeholder="How many payment intervals does a subscription last?" value="{groups.count}">
+				<input type="text" class="form-control subscription-count" placeholder="How many payment intervals does a subscription last?" value="{groups.subscriptioncount}">
 			</div>
 		</div>
 

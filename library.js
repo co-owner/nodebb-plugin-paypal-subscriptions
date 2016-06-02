@@ -15,7 +15,8 @@ var async = module.parent.require('async'),
 	user = module.parent.require('./user'),
 	plugins = module.parent.require('./plugins'),
 	
-    controllers = require('./lib/controllers');
+    controllers = require('./lib/controllers'),
+    subscriptions = require('./lib/subscriptions');
     /*Paypal = require('paypal-recurring'),*/
 
 (function(module) {
@@ -37,52 +38,46 @@ var async = module.parent.require('async'),
 	cronJobs.push(new cron('00 00 00 1 0 *', function() { pullGroupsInterval('year'); }, null, false));
 	*/
     /*these should happen often*/
+    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('justjoined'); }, null, false)); /*Checks if there's a trial period*/
+    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('trial'); }, null, false));
     cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('paid'); }, null, false));
-    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('unpaid'); }, null, false));
-    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('grace'); }, null, false));
-    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('removed'); }, null, false));
+    cronJobs.push(new cron('00 00 0-23 * * *', function() { checkOnSubscriptions('subscriptionexpired'); }, null, false)); /*Notifies user, kicks them out depending on mode*/
     
     function checkOnSubscriptions(status){
         /*get the subscription settings we'll pass on to the other functions*/
-        var groupsList = [];
-        admin.getGroups(function(err, groups) {
-            /*No groups? Make a speedy exit*/
-			if (err || !Array.isArray(groups)) {
+        var settings = [];
+        subscriptions.getAllSubscriptionSettings(function(err, subscriptionsettings) {
+            /*No settings? Make a speedy exit*/
+			if (err || !Array.isArray(subscriptionsettings)) {
 				return;
 			}
-            groupsList = groups;
+            settings = subscriptionsettings;
 		});
         /*Do we have any settings to go through at all?*/
-        if(!groupsList || !groupsList.length){
+        if(!settings || !settings.length){
             /*No? Then don't bother*/
             return;
         }
-        /*Now we should have our settings, lets check on existing jobs*/
-        admin.getSubscriptionJobs(function(err,jobs){
-            if(err || !Array.isArray(jobs)){
+        /*Now we should have our settings, lets check on existing usersubscriptions*/
+        subscriptions.getUserSubscriptions(function(err,usersubscriptions){
+            if(err || !Array.isArray(usersubscriptions)){
                 return;
             }
             
-            jobs = jobs.filter(function(job) {
-                return job && job.status == status;
+            usersubscriptions = usersubscriptions.filter(function(usersubscription) {
+                return usersubscription && usersubscription.status == status;
             });
             /*perform a different set of actions based on the current status of the jobs in question*/
-            performJobs(jobs,groupsList);
+            performJobs(usersubscriptions,settings);
         });
     }
     
     /*Do all jobs handed over at once, with neat error messsages if things go wrong*/
-    function performJobs(jobs,groupsList){
+    function performJobs(usersubscriptions,settingslist){
         /*pass groupsList down into doJob function*/
-        /*
-        async.eachSeries(jobs, doJob, function(err) {
-            if(err) {
-                winston.error(err.message);
-            }           
-        });
-        */
-        async.eachSeries(jobs, function(job, callback) {
-                doJob(job,groupsList,callback);
+        async.eachSeries(usersubscriptions, 
+            function(usersubscription, callback) {
+                doJob(usersubscription,settingslist,callback);
             },function(err) {
                 if(err) {
                     winston.error(err.message);
@@ -91,19 +86,20 @@ var async = module.parent.require('async'),
         );
     }
     
-    function doJob(job,groupsList,callback){
-        if(!job){
+    /*TODO: Refactor*/
+    function doJob(usersubscription,groupsList,callback){
+        if(!usersubscription){
             return callback();
         }
-        if(!job.userGroupJoinedDate){
-            job.userGroupJoinedDate = new Date();
+        if(!usersubscription.userGroupJoinedDate){
+            usersubscription.userGroupJoinedDate = new Date();
         }
-        if(!job.userGroupPaidDate){
+        if(!usersubscription.userGroupPaidDate){
             /*Paid Jan 1st of 1990...IE never*/
-            job.userGroupJoinedDate = new Date(1990, 0, 1);
+            usersubscription.userGroupJoinedDate = new Date(1990, 0, 1);
         }
         
-        if(job.status == 'paid'){
+        if(usersubscription.status == 'paid'){
             /*TODO: write test case for user subscription expiration*/
             /*Check to see if the user should be moved to the unpaid state based on the user's join date, the last paid date and cron job pattern*/
             var isStillPaid = false;
@@ -155,39 +151,6 @@ var async = module.parent.require('async'),
         /*On successful payment call this function*/
         /*setSubscriptionJobField(job,'userGroupPaidDate',new Date(),callback);*/
     }
-    
-    function onExpiredSubscriptionPeriod(job,callback){
-        setSubscriptionJobField(job,'status','subscriptionexpired',callback);
-    }
-    
-    function onUserSubscriptionExpired(job,callback){
-        setSubscriptionJobField(job,'status','removedornew',callback);
-    }
-    
-    /*user successfully notified of invoice*/
-    function onSuccessfulSetup(job,groupsList,callback){
-        if(groupsList[0].endbehavior == 'blocked'){
-            /*TODO: Remove User From Group*/
-            setSubscriptionJobField(job,'status','removed',callback);
-        } else if (groupsList[0].endbehavior == 'grace') {
-            setSubscriptionJobField(job,'status','grace',callback);
-        } else {
-            /*This shouldn't happen*/
-        }
-    }
-    
-    function onExpiredGracePeriod(job,callback){
-        /*TODO: Remove User From Group*/
-        setSubscriptionJobField(job,'status','blocked',callback);
-    }
-    
-    /*user successfully pays bill*/
-    function onSuccessfulPayment(job,callback){
-        setSubscriptionJobField(job,'status','paid',callback);
-        setSubscriptionJobField(job,'userGroupPaidDate',new Date(),callback);
-        /*TODO: Add User Into Group*/
-        
-    }
 
 	plugins.isActive('nodebb-plugin-paypal-subscriptions', function(err, active) {
 		if (err) {
@@ -221,7 +184,7 @@ var async = module.parent.require('async'),
 	function renderAdminPage(req, res, next) {
 		async.parallel({
 			groups: function(next) {
-				admin.getGroups(next);
+				subscriptions.getAllSubscriptionSettings(next);
 			},
 			settings: function(next) {
 				admin.getSettings(next);
@@ -236,7 +199,7 @@ var async = module.parent.require('async'),
 	};
 
 	function save(req, res, next) {
-		deleteGroups(function(err) {
+		subscriptions.deleteAllSubscriptionSettings(function(err) {
 			if (err) {
 				return next(err);
 			}
@@ -247,7 +210,7 @@ var async = module.parent.require('async'),
 
 			async.parallel([
 				function(next) {
-					saveGroups(req.body.groups, next);
+					subscriptions.setSubscriptionSettings(req.body.groups, next);
 				},
 				function(next) {
 					admin.saveSettings(req.body.settings, next);
@@ -280,7 +243,7 @@ var async = module.parent.require('async'),
 	}
 	/**/
 	function pullGroupsInterval(interval) {
-		admin.getGroups(function(err, groups) {
+		subscriptions.getAllSubscriptionSettings(function(err, groups) {
 			if (err || !Array.isArray(groups)) {
 				return;
 			}
@@ -313,43 +276,6 @@ var async = module.parent.require('async'),
 		/*exit*/
 		return callback();
 	}
-	
-	/*something like this:*/
-	function giveUserTrialMembership(user,group,trialinterval,triallength){
-		/*add user to group*/ 
-		/*queue up job to remove the user from that group trialinterval x triallength from now*/
-		/*...there's a few cron jobs which should ping at every interval...*/
-		/*...add job revokeUserSubscription(user,group);*/
-	}
-	
-	function extendTrialPeriod(user,group,trialinterval,triallength){
-		/*double check the user's trial period in the subscription is less than the one the admin will give*/
-		
-		/*remove the user's previous trial period*/
-		
-		/*replace the grace trial with the new one*/
-	}
-	
-	function giveUserGracePeriod(user,group,graceinterval,gracelength){
-		/*at the end of a subscription, this function will be called, if there is no grace period to give the user will be removed instantly*/
-	}
-	
-	/*For admins who'd like to be nice I'd imagine there'd be a button to do this*/
-	function extendGracePeriod(user,group,graceinterval,gracelength){
-		/*double check the user's grace period in the subscription is less than the one the admin will give*/
-		
-		/*remove the user's previous grace period*/
-		
-		/*replace the grace period with the new one*/
-	}
-	
-	function addUserSubscription(user,group){
-		/*add user to group*/
-		/*remove all trial and grace periods*/
-	}
-	function revokeUserSubscription(user,group){
-		/*remove user from group*/
-	}
 
 	var admin = {};
 
@@ -362,38 +288,6 @@ var async = module.parent.require('async'),
 	
 		callback(null, header);
 	};
-
-	admin.getGroups = function(callback) {
-		db.getSetMembers('nodebb-plugin-paypal-subscriptions:groups', function(err, groupNames) {
-			if (err) {
-				return callback(err);
-			}
-
-			async.map(groupNames, function (groupName, next) {
-				db.getObject('nodebb-plugin-paypal-subscriptions:group:' + groupName, next);
-			}, function(err, results) {
-				if (err) {
-					return callback(err);
-				}
-				results.forEach(function(group) {
-					if (group) {
-					  /*Assign the defaults on the backend*/
-						/*feed.entriesToPull = feed.entriesToPull || 4;*/
-						group.cost = group.cost || 5;
-						group.graceinterval = group.graceinterval || 'weeks';
-						group.gracelength = group.gracelength || 0;
-						group.trialinterval = group.trialinterval || 'weeks';
-						group.triallength = group.triallength || 0;
-						group.interval = group.interval || 'months';
-						group.length = group.length || 1;
-						group.endbehavior = group.endbehavior || 'blocked';
-					}
-				});
-
-				callback(null, results ? results : []);
-			});
-		});
-	};
     
     admin.getPaidJobs = function(callback) {
         
@@ -402,103 +296,6 @@ var async = module.parent.require('async'),
     admin.getUnpaidJobs = function(callback) {
         
     };
-    
-    admin.getSubscriptionJobs = function(callback) {
-        db.getSetMembers('nodebb-plugin-paypal-subscriptions:jobs', function(err, userIds) {
-			if (err) {
-				return callback(err);
-			}
-
-			async.map(userIds, function (groupName, next) {
-				db.getObject('nodebb-plugin-paypal-subscriptions:job:' + userIds, next);
-			}, function(err, results) {
-				if (err) {
-					return callback(err);
-				}
-                /*default status for any *new* user is paid*/
-				results.forEach(function(nodebbUser) {
-					if (nodebbUser) {
-                        /*Assign the defaults on the backend*/
-                        nodebbUser.status = nodebbUser.status || 'paid';
-					}
-				});
-
-				callback(null, results ? results : []);
-			});
-		});
-    }
-    
-    function setSubscriptionJobField(jobObject,fieldName,value,callback){
-        db.setObjectField('nodebb-plugin-paypal-subscriptions:job:' + jobObject.userid+'-'jobObject.groupname, fieldName, value, callback);
-    }
-    
-    function setSubscriptionJob(jobObject,callback){
-        db.setObject('nodebb-plugin-paypal-subscriptions:job:' + jobObject.userid+'-'jobObject.groupname, jobObject, callback);
-    }
-    
-    /*saves a user's status in their group (paid, unpaid, grace / removed): note the ability of users to belong to multiple groups*/
-    function saveSubscriptionJobs(jobs, callback) {
-		async.each(jobs, function saveJobs(jobItem, next) {
-            /*making sure we only save jobs which fit the full criterion*/
-			if(!(jobItem.userid && jobItem.groupname && jobItem.status)) {
-				return next();
-			}
-			async.parallel([
-				function(next) {
-                    /*should be* a unique key jobItem.userid+'-'jobItem.groupname*/
-					db.setObject('nodebb-plugin-paypal-subscriptions:job:' + jobItem.userid+'-'jobItem.groupname, jobItem, next);
-				},
-				function(next) {
-					db.setAdd('nodebb-plugin-paypal-subscriptions:jobs', jobItem.userid+'-'jobItem.groupname, next);
-				}
-			], next);
-		}, callback);
-	}
-    
-    /*theoretically, should never be called except on uninstall, would reset all users to the default state*/
-    function deleteSubscriptionJobs(callback) {
-		callback = callback || function() {};
-		db.getSetMembers('nodebb-plugin-paypal-subscriptions:jobs', function(err, jobs) {
-			if (err || !jobs || !jobs.length) {
-				return callback(err);
-			}
-            /*The key follows the pattern from saveSubscriptionJobs()*/
-			async.each(jobs, function(key, next) {
-				async.parallel([
-					function(next) {
-						db.delete('nodebb-plugin-paypal-subscriptions:job:' + key, next);
-					},
-					function(next) {
-						db.setRemove('nodebb-plugin-paypal-subscriptions:jobs', key, next);
-					}
-				], next);
-			}, callback);
-		});
-	}
-
-    function deleteSubscriptionJobsByGroupName(groupname,callback) {
-		callback = callback || function() {};
-		db.getSetMembers('nodebb-plugin-paypal-subscriptions:jobs', function(err, jobs) {
-			if (err || !jobs || !jobs.length) {
-				return callback(err);
-			}
-            
-            jobs = jobs.filter(function(job) {
-                return job && job.groupname == groupname;
-            });
-            /*The key follows the pattern from saveSubscriptionJobs()*/
-			async.each(jobs, function(key, next) {
-				async.parallel([
-					function(next) {
-						db.delete('nodebb-plugin-paypal-subscriptions:job:' + key, next);
-					},
-					function(next) {
-						db.setRemove('nodebb-plugin-paypal-subscriptions:jobs', key, next);
-					}
-				], next);
-			}, callback);
-		});
-	}
     
 	admin.getSettings = function(callback) {
 		db.getObject('nodebb-plugin-paypal-subscriptions:settings', function(err, settings) {
@@ -523,66 +320,6 @@ var async = module.parent.require('async'),
 			callback();
 		});
 	};
-
-	function saveGroups(groups, callback) {
-		async.each(groups, function saveGroup(groupItem, next) {
-			if(!groupItem.name && groupItem.group) {
-				return next();
-			}
-			async.parallel([
-				function(next) {
-					db.setObject('nodebb-plugin-paypal-subscriptions:group:' + groupItem.name, groupItem, next);
-				},
-				function(next) {
-					db.setAdd('nodebb-plugin-paypal-subscriptions:groups', groupItem.name, next);
-				}
-			], next);
-		}, callback);
-	}
-
-	function deleteGroups(callback) {
-		callback = callback || function() {};
-		db.getSetMembers('nodebb-plugin-paypal-subscriptions:groups', function(err, groups) {
-			if (err || !groups || !groups.length) {
-				return callback(err);
-			}
-
-			async.each(groups, function(key, next) {
-				async.parallel([
-					function(next) {
-						db.delete('nodebb-plugin-paypal-subscriptions:group:' + key, next);
-					},
-					function(next) {
-						db.setRemove('nodebb-plugin-paypal-subscriptions:groups', key, next);
-					}
-				], next);
-			}, callback);
-		});
-	}
-    
-    function deleteSubscriptionsByGroupName(groupname,callback) {
-        callback = callback || function() {};
-		db.getSetMembers('nodebb-plugin-paypal-subscriptions:groups', function(err, groups) {
-			if (err || !groups || !groups.length) {
-				return callback(err);
-			}
-            
-            groups = groups.filter(function(group){
-               return group && group.name == groupname; 
-            });
-            
-			async.each(groups, function(key, next) {
-				async.parallel([
-					function(next) {
-						db.delete('nodebb-plugin-paypal-subscriptions:group:' + key, next);
-					},
-					function(next) {
-						db.setRemove('nodebb-plugin-paypal-subscriptions:groups', key, next);
-					}
-				], next);
-			}, callback);
-		});
-    }
 
 	function deleteSettings(callback) {
 		callback = callback || function() {};
@@ -615,9 +352,9 @@ var async = module.parent.require('async'),
 
 	admin.uninstall = function(id) {
 		if (id === 'nodebb-plugin-paypal-subscriptions') {
-			deleteGroups();
 			deleteSettings();
-            deleteSubscriptionJobs();
+            subscriptions.deleteAllSubscriptionSettings();
+            subscriptions.deleteUserSubscriptions();
 		}
 	};
 
@@ -629,13 +366,13 @@ var async = module.parent.require('async'),
 	});
     
     admin.onGroupDestroyed = function(groupObj) {
-        deleteSubscriptionJobsByGroupName(groupObj.name);
-        deleteSubscriptionsByGroupName(groupObj.name);
+        subscriptions.deleteUserSubscriptionsByName(groupObj.name);
+        subscriptions.deleteSubscriptionSettingsByName(groupObj.name);
     }
     
-    admin.onGroupRenamed = function(oldgroupname,newgroupname) {
+    admin.onGroupRenamed = function(oldname,newname) {
         var newGroupsList = [];
-        admin.getGroups(function(err, groups) {
+        subscriptions.getAllSubscriptionSettings(function(err, groups) {
             /*No groups? Make a speedy exit*/
 			if (err || !Array.isArray(groups)) {
 				return;
@@ -644,26 +381,29 @@ var async = module.parent.require('async'),
             groups.forEach(function(group) {
                /*switch the names*/
                if(group) {
-                    if(group.name == oldgroupname){
-                        group.name = newgroupname;
+                    if(group.name == oldgname){
+                        group.name = newname;
                     }
                }               
             });
             
             newGroupsList = groups;
+            plugins.fireHook('filter:nodebb-plugin-paypal-subscriptions.subscriptionsettingrenamed', {oldname: oldname,newname: newname});
 		});
         /*Do we have any settings to go through at all?*/
         if(!newGroupsList || !newGroupsList.length){
             /*No? Then remove any jobs that exist*/
-            deleteSubscriptionJobs();
+            subscriptions.deleteUserSubscriptions();
             return;
         }
         
-        saveGroups(newGroupsList,function(){
+        subscriptions.deleteAllSubscriptionSettings();
+        
+        subscriptions.setSubscriptionSettings(newGroupsList,function(){
             
            /*Same process on jobs*/
             var newJobsList = [];
-            admin.getSubscriptionJobs(function(err, jobs) {
+            subscriptions.getUserSubscriptions(function(err, jobs) {
                 /*No groups? Make a speedy exit*/
                 if (err || !Array.isArray(jobs)) {
                     return;
@@ -672,8 +412,8 @@ var async = module.parent.require('async'),
                 jobs.forEach(function(job) {
                    /*switch the names*/
                    if(job) {
-                        if(job.groupname == oldgroupname){
-                            job.groupname = newgroupname;
+                        if(job.name == oldname){
+                            job.name = newname;
                         }
                    }               
                 });
@@ -685,8 +425,9 @@ var async = module.parent.require('async'),
                 return;
             }
             
-            saveSubscriptionJobs(newJobsList,null); 
+            subscriptions.deleteUserSubscriptions();
             
+            subscriptions.addUserSubscriptions(newJobsList,null); 
         });
     }
     
