@@ -160,7 +160,9 @@ var async = module.parent.require('async'),
 	  		hostControllers = params.controllers;
 	  
         router.post('/api/admin/plugins/paypal-subscriptions/ipn/:sandbox', controllers.instantPaypalNotification);
-	  	router.get('/admin/plugins/paypal-subscriptions', params.middleware.applyCSRF, hostMiddleware.admin.buildHeader, renderAdminPage);
+        router.get('/api/admin/plugins/paypal-subscriptions/payment/:paymentstatus', controllers.instantPaypalNotification);
+	  	
+        router.get('/admin/plugins/paypal-subscriptions', params.middleware.applyCSRF, hostMiddleware.admin.buildHeader, renderAdminPage);
 	  	router.get('/api/admin/plugins/paypal-subscriptions', params.middleware.applyCSRF, renderAdminPage);
 	  	router.post('/api/admin/plugins/paypal-subscriptions/save', params.middleware.applyCSRF, save);
 	  
@@ -344,9 +346,9 @@ var async = module.parent.require('async'),
 		});
         /*Do we have any settings to go through at all?*/
         if(!newGroupsList || !newGroupsList.length){
-            /*No? Then remove any jobs that exist*/
-            subscriptions.deleteUserSubscriptions();
-            return;
+            /*No?*/
+            /*subscriptions.deleteUserSubscriptions();*/
+            return winston.warn('No subscriptions saved');
         }
         
         subscriptions.deleteAllSubscriptionSettings();

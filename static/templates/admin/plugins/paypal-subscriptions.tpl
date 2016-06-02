@@ -1,10 +1,10 @@
-<form role="form" class="quickstart-settings">
+<form role="form" class="nodebb-plugin-paypal-subscriptions-settings">
 	<div class="row">
 		<div class="col-sm-2 col-xs-12 settings-header">General</div>
 		<div class="col-sm-10 col-xs-12">
 			<p class="lead">
 				Adjust these settings. You can then retrieve these settings in code via:
-				<code>meta.settings.get('quickstart');</code>
+				<code>meta.settings.get('nodebb-plugin-paypal-subscriptions');</code>
 			</p>
 			<div class="form-group">
 				<label for="setting-1">Default Subscription Type</label>
@@ -24,6 +24,10 @@
 
 <button id="addSubscription" class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
 	<i class="material-icons">add box</i>
+</button>
+
+<button id="testPayment" class="mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+	<i class="material-icons">test</i>
 </button>
 
 <button id="save" class="floating-button mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
@@ -92,8 +96,8 @@
 						gracecount: 0,
 						trialinterval: 'weeks',
 						trialcount: 0,
-						interval: 'months',
-						count: 1,
+						subscriptioninterval: 'months',
+						subscriptioncount: 1,
 						endbehavior: 'blocked'
 					}]
 				});
@@ -122,9 +126,12 @@
 					gracecount: child.find('.subscription-grace-count').val(),
 					trialinterval: child.find('.subscription-trial-interval').val(),
 					trialcount: child.find('.subscription-trial-count').val(),
-					interval: child.find('.subscription-interval').val(),
-					count: child.find('.subscription-count').val(),
-					endBehavior: child.find('.subscription-end-behavior').val()
+					subscriptioninterval: child.find('.subscription-interval').val(),
+					subscriptioncount: child.find('.subscription-count').val(),
+					endbehavior: child.find('.subscription-end-behavior').val(),
+                    ignoreAdmins: child.find('.subscription-ignore-admins:checked').val(),
+                    ignoreModerators: child.find('.subscription-ignore-moderators:checked').val(),
+                    ignoreGroupOwner: child.find('.subscription-ignore-group-owner:checked').val()
 				};
 				/*Must haves~before we save anything...*/
                 console.log(groupItem);
@@ -152,6 +159,40 @@
 			});
 			return false;
 		});
+        
+        $('#testPayment').on('click', function() {
+            $.post('https://api.sandbox.paypal.com/v1/payments/payment', {
+                "intent":"sale",
+                    "payer":{
+                    "payment_method":"paypal"
+                },
+                "redirect_urls":{
+                    "return_url":"{config.relative_path}/api/admin/plugins/paypal-subscriptions/",
+                    "cancel_url":"{config.relative_path}/api/admin/plugins/paypal-subscriptions/"
+                },
+                "transactions":[
+                    {
+                        "amount":{
+                            "total":"7.47",
+                            "currency":"USD",
+                            "details":{
+                                "subtotal":"7.41",
+                                "tax":"0.03",
+                                "shipping":"0.03"
+                            }
+                        },
+                        "description":"This is the payment transaction description."
+                    }
+                ]
+            }, function(data) {
+				app.alert({
+					title: 'Success',
+					message: data.message,
+					type: 'success',
+					timeout: 2000
+				});
+			});
+        });
 		function enableAutoComplete(selector) {
 			selector.autocomplete({
 				source: function(request, response) {

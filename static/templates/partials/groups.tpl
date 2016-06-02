@@ -106,7 +106,7 @@
         <div class="col-sm-3 col-xs-12">
 			<div class="form-group checkbox">
                 <label>
-                    <input class="form-control subscription-ignore-admins" type="checkbox" <!-- IF groups.ignoreAdmins -->checked<!-- ENDIF groups.ignoreAdmins -->> Ignore Admins
+                    <input class="form-control subscription-ignore-admins" type="checkbox" value="{groups.ignoreAdmins}"> Ignore Admins
                 </label>
 			</div>
 		</div>
@@ -114,7 +114,7 @@
         <div class="col-sm-3 col-xs-12">
 			<div class="form-group checkbox">
                 <label>
-                    <input class="form-control subscription-ignore-moderators" type="checkbox" <!-- IF groups.ignoreModerators -->checked<!-- ENDIF groups.ignoreModerators -->> Moderators
+                    <input class="form-control subscription-ignore-moderators" type="checkbox" value="groups.ignoreModerators"> Moderators
                 </label>
 			</div>
 		</div>
@@ -122,7 +122,7 @@
         <div class="col-sm-3 col-xs-12">
 			<div class="form-group checkbox">
                 <label>
-                    <input class="form-control subscription-ignore-group-owner" type="checkbox" <!-- IF groups.ignoreGroupOwner -->checked<!-- ENDIF groups.ignoreGroupOwner -->> Group Owner
+                    <input class="form-control subscription-ignore-group-owner" type="checkbox" value="groups.ignoreGroupOwner"> Group Owner
                 </label>
 			</div>
 		</div>
