@@ -69,6 +69,10 @@
 			$('.subscription-grace-interval').each(function(index,element) {
 				$(element).val($(element).attr('data-interval'));
 			});
+            
+            $('.subscription-trial-interval').each(function(index,element) {
+				$(element).val($(element).attr('data-interval'));
+			});
 
 			$('.subscription-group').each(function(index, element) {
 				$(element).val($(element).attr('data-group'));
